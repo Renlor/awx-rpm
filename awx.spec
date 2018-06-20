@@ -2,7 +2,7 @@
 %define _mandir %{_prefix}/share/man
 %global __os_install_post %{nil}
 
-%define ansible_version 2.5.0.0
+%define ansible_version 2.5.5.0
 %define service_user awx
 %define service_group awx
 %define service_homedir /var/lib/awx
@@ -15,7 +15,7 @@ Version: ¤VERSION¤
 Release: 1%{dist}
 Source0: /dist/¤SOURCE¤
 Source1: settings.py.dist
-%if 0%{?amzn}
+%if 0%{?amzn} || 0%{?el6}
 Source2: awx-cbreceiver.upstart
 Source3: awx-celery-beat.upstart
 Source4: awx-celery-worker.upstart
@@ -40,9 +40,10 @@ Prefix: %{_prefix}
 BuildRequires: gcc gcc-c++ git
 BuildRequires: libffi-devel libxslt-devel xmlsec1-devel xmlsec1-openssl-devel libyaml-devel openldap-devel libtool-ltdl-devel libcurl-devel
 %{?amzn:BuildRequires: python27 python27-virtualenv python27-devel postgresql95-devel}
+%{?el6:BuildRequires: python27-python python27-python-virtualenv python27-python-devel rh-postgresql95-postgresql-devel}
 %{?el7:BuildRequires: systemd python python-virtualenv python-devel postgresql-devel}
 %{?fedora:BuildRequires: systemd python python-virtualenv python-devel postgresql-devel m2crypto}
-Requires: git subversion curl bubblewrap
+Requires: git subversion curl %{?el7:bubblewrap}%{?amzn:bubblewrap}%{?fedora:bubblewrap}
 Requires(pre): /usr/sbin/useradd, /usr/bin/getent
 %{?systemd_requires}
 
@@ -63,18 +64,22 @@ export PYTHONPATH="`pwd`/embedded/lib/python2.7/site-packages:`pwd`/embedded/lib
 
 # Install dependencies
 cat requirements/requirements_ansible.txt requirements/requirements_ansible_git.txt | \
-    _buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --prefix=`pwd`/embedded/ -r /dev/stdin
+    _buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --no-clean --prefix=`pwd`/embedded/ -r /dev/stdin
 cat requirements/requirements.txt requirements/requirements_git.txt | \
-    _buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --prefix=`pwd`/embedded/ -r /dev/stdin
+    _buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --no-clean --prefix=`pwd`/embedded/ -r /dev/stdin
+echo "django-rest-swagger" | \
+    _buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --no-clean --prefix=`pwd`/embedded/ -r /dev/stdin
 
-_buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --prefix=`pwd`/embedded/ ansible==%{ansible_version}
-_buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --prefix=`pwd`/embedded/ .
+
+_buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --no-clean --prefix=`pwd`/embedded/ ansible==%{ansible_version}
+_buildenv/bin/pip install --no-binary cffi,pycparser,psycopg2,twilio --no-clean --prefix=`pwd`/embedded/ .
 
 # Fix nested packages
 touch embedded/lib64/python2.7/site-packages/zope/__init__.py
 touch embedded/lib/python2.7/site-packages/jaraco/__init__.py
 touch embedded/lib64/python2.7/site-packages/dm/__init__.py
 touch embedded/lib64/python2.7/site-packages/dm/xmlsec/__init__.py
+mkdir embedded/lib/python2.7/site-packages/awx/ui/static
 
 # Collect django static
 cat > _awx_rpmbuild_collectstatic_settings.py <<EOF
@@ -105,9 +110,10 @@ echo %{version} > %{buildroot}%{service_homedir}/.tower_version
 cp %{_sourcedir}/settings.py.dist %{buildroot}%{service_configdir}/settings.py
 mv embedded/lib %{buildroot}%{_prefix}/embedded/lib
 mv embedded/lib64 %{buildroot}%{_prefix}/embedded/lib64
+#mv embedded/bin %{buildroot}%{_prefix}/embedded/bin
 mv static %{buildroot}%{_prefix}/static
 
-%if 0%{?amzn}
+%if 0%{?amzn} || 0%{?el6}
 # Install upstart configuration
 mkdir -p %{buildroot}/etc/init
 mkdir -p %{buildroot}/etc/rc.d/init.d
@@ -134,9 +140,11 @@ done
 # Create fake python executable
 cat > %{buildroot}%{_prefix}/bin/python <<"EOF"
 #!/bin/sh
+%{?el6:source /opt/rh/python27/enable}
+%{?el6:source /opt/rh/rh-postgresql95/enable}
 export PYTHONPATH="%{_prefix}/embedded/lib/python2.7/site-packages:%{_prefix}/embedded/lib64/python2.7/site-packages"
 export AWX_SETTINGS_FILE=/etc/awx/settings.py
-exec %{?amzn:python27}%{?el7:python2} "$@"
+exec %{?el6:python2.7}%{?amzn:python27}%{?el7:python2} "$@"
 EOF
 
 # Export usefull scripts
@@ -166,7 +174,7 @@ cp %{_sourcedir}/nginx.conf.example ./
 %systemd_post awx-web
 %endif
 
-%if 0%{?amzn}
+%if 0%{?amzn} || 0%{?el6}
 if [ $1 -eq 1 ]; then
     /sbin/chkconfig --add awx-cbreceiver
     /sbin/chkconfig --add awx-celery-beat
@@ -187,7 +195,7 @@ fi
 %systemd_preun awx-web
 %endif
 
-%if 0%{?amzn}
+%if 0%{?amzn} || 0%{?el6}
 if [ $1 -eq 0 ]; then
     /sbin/service awx-cbreceiver stop >/dev/null 2>&1
     /sbin/service awx-celery-beat stop >/dev/null 2>&1
@@ -229,15 +237,15 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755, root, root) %{_prefix}/bin/ansible
 %attr(0755, root, root) %{_prefix}/bin/ansible-playbook
 %attr(0755, awx, awx) %{_prefix}/static
-%attr(0755, awx, awx) %{_prefix}/embedded/lib
-%attr(0755, awx, awx) %{_prefix}/embedded/lib64
 %attr(0755, awx, awx) %{_prefix}/embedded
+#%attr(0755, awx, awx) %{_prefix}/embedded/lib
+#%attr(0755, awx, awx) %{_prefix}/embedded/lib64
 %dir %attr(0750, %{service_user}, %{service_group}) %{service_homedir}
 %{service_homedir}/.tower_version
 %dir %attr(0770, root, %{service_group}) %{service_logdir}
 %config(noreplace) %{service_configdir}/settings.py
 
-%if 0%{?amzn}
+%if 0%{?amzn} || 0%{?el6}
 %attr(0644, root, root) /etc/init/awx-cbreceiver.conf
 %attr(0644, root, root) /etc/init/awx-celery-beat.conf
 %attr(0644, root, root) /etc/init/awx-celery-worker.conf

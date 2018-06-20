@@ -6,7 +6,8 @@ SPECFILE="/source/$1"
 
 yum install -y rpmdevtools yum-utils fakeroot
 
-useradd -s /bin/bash builder
+id -u builder &>/dev/null || useradd -s /bin/bash builder
+mkdir -p /cache /source /result
 chown builder. /cache -R
 
 pushd /source
@@ -26,7 +27,7 @@ cat > ~/.rpmmacros <<EOT
 EOT
 
 mkdir -p /tmp/buildd/{BUILD,BUILDROOT,RPMS,SPECS,SRPMS}
-ln -s /source /tmp/buildd/SOURCES
+ln -sfn /source /tmp/buildd/SOURCES
 
 fakeroot-sysv rpmbuild -ba $SPECFILE
 EOF

@@ -1,12 +1,12 @@
 # AWX-RPM
 
-[![Build Status](https://travis-ci.org/subuk/awx-rpm.svg?branch=master)](https://travis-ci.org/subuk/awx-rpm)
-
 Fat RPMs for ansible-awx project.
 
-Tested distributions:
-- Amazon linux 2017.3
-- Centos 7
+In Development Distributions:
+- centos 6
+
+Tested Distributions:
+- NONE
 
 ## How to build RPM
 

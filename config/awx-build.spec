@@ -32,6 +32,9 @@ Source6: awx-daphne.service
 Source7: awx-web.service
 %endif
 Source8: nginx.conf.example
+%if 0%{?el6}
+Source9: proot
+%endif
 License: GPLv3
 Group: AWX
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}.buildroot
@@ -43,7 +46,7 @@ BuildRequires: libffi-devel libxslt-devel xmlsec1-devel xmlsec1-openssl-devel li
 %{?el6:BuildRequires: python27-python python27-python-virtualenv python27-python-devel rh-postgresql95-postgresql-devel}
 %{?el7:BuildRequires: systemd python python-virtualenv python-devel postgresql-devel}
 %{?fedora:BuildRequires: systemd python python-virtualenv python-devel postgresql-devel m2crypto}
-Requires: git subversion curl %{?el7:bubblewrap}%{?amzn:bubblewrap}%{?fedora:bubblewrap}
+Requires: git subversion curl %{?el6:proot upstart}%{?el7:bubblewrap}%{?amzn:bubblewrap}%{?fedora:bubblewrap}
 
 Requires(pre): /usr/sbin/useradd, /usr/bin/getent
 %{?systemd_requires}
@@ -106,6 +109,8 @@ mkdir -p %{buildroot}%{_prefix}/bin
 mkdir -p %{buildroot}%{service_configdir}
 mkdir -p %{buildroot}/var/lib/awx/
 echo %{version} > %{buildroot}%{service_homedir}/.tower_version
+
+cp %{_sourcedir}/proot %{buildroot}%{_prefix}/bin
 
 cp %{_sourcedir}/settings.py.dist %{buildroot}%{service_configdir}/settings.py
 mv embedded/lib %{buildroot}%{_prefix}/embedded/lib
